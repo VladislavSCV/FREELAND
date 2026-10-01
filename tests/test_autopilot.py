@@ -294,6 +294,21 @@ def test_unknown_client_score_and_threshold_alias(db, catalog, cfg, monkeypatch)
     assert application.score == score_10(75 * .47 + 70 * .33 + 75 * .20)
 
 
+def test_price_follows_budget_but_not_below_minimum(db, catalog, cfg):
+    from app.models import LeadAnalysis
+
+    def price_for(budget):
+        row, _ = create_lead(db, LeadInput(source="test", title=f"Telegram bot {budget}", description=f"Need a Telegram bot, budget {budget}", budget_max=budget))
+        asyncio.run(evaluate(db, row))
+        return db.scalar(select(LeadAnalysis).where(LeadAnalysis.lead_id == row.id)).recommended_price
+
+    # Mock estimate: 10 h x 45 = 450 USD; TELEGRAM_BOT minimum 250.
+    assert price_for(None) == 450
+    assert price_for(300) == 300
+    assert price_for(100) == 250
+    assert price_for(5000) == 450
+
+
 def test_project_model_defaults(db):
     row = lead(db)
     project = Project(lead_id=row.id, name="x", service_category="TELEGRAM_BOT", contract_price=100, currency="USD", estimated_hours=1)
@@ -343,3 +358,22 @@ def test_reevaluate_archived_and_budget_warning(db, catalog, cfg):
     card = application_card(good, again, 48600)
     assert "Наша цена: 48600" in card and "выше бюджета" in card
     assert "выше бюджета" not in application_card(good, again, 2500)
+
+
+def test_telegram_channels_use_mirror(monkeypatch):
+    from app.workers.scraper import configured_sources
+
+    cfg = settings()
+    monkeypatch.setattr(cfg, "scraper_sources", "telegram")
+    monkeypatch.setattr(cfg, "telegram_channels", "orders_ru")
+    monkeypatch.setattr(cfg, "telegram_api_url", "https://tg.example.workers.dev/")
+    (source,) = configured_sources(cfg)
+    seen = []
+
+    class Fetcher:
+        async def get(self, url, source=""):
+            seen.append(url)
+            return TG_PAGE
+
+    asyncio.run(source.fetch(Fetcher()))
+    assert seen == ["https://tg.example.workers.dev/s/orders_ru"]

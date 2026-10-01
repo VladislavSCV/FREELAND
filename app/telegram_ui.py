@@ -12,6 +12,20 @@ log = logging.getLogger(__name__)
 EDIT_MARKER = "✏️ Новый текст отклика для заявки #A"
 
 
+def make_bot() -> Bot:
+    """Bot client honouring TELEGRAM_API_URL / TELEGRAM_PROXY (needed where Telegram is blocked)."""
+    cfg = settings()
+    if not cfg.telegram_api_url and not cfg.telegram_proxy:
+        return Bot(cfg.telegram_bot_token)
+    from aiogram.client.session.aiohttp import AiohttpSession
+    from aiogram.client.telegram import TelegramAPIServer
+
+    session = AiohttpSession(proxy=cfg.telegram_proxy or None)
+    if cfg.telegram_api_url:
+        session.api = TelegramAPIServer.from_base(cfg.telegram_api_url.rstrip("/"))
+    return Bot(cfg.telegram_bot_token, session=session)
+
+
 def _budget(lead: Lead) -> str:
     if lead.budget_min and lead.budget_max and lead.budget_min != lead.budget_max:
         return f"{lead.budget_min:g}–{lead.budget_max:g} {lead.currency}"

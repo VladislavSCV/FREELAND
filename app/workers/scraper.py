@@ -130,12 +130,14 @@ class FlRssSource:
 
 
 class TelegramChannelSource:
-    def __init__(self, channel: str):
+    def __init__(self, channel: str, base_url: str = "https://t.me"):
         self.channel = channel.strip().lstrip("@").removeprefix("https://t.me/").strip("/")
         self.name = f"tg_{self.channel}"[:80]
+        # TELEGRAM_API_URL (the Cloudflare Worker) also mirrors t.me/s/ for servers where t.me is blocked.
+        self.base_url = base_url.rstrip("/")
 
     async def fetch(self, fetcher: Fetcher) -> list[LeadInput]:
-        return list(self.parse(await fetcher.get(f"https://t.me/s/{self.channel}", "telegram")))
+        return list(self.parse(await fetcher.get(f"{self.base_url}/s/{self.channel}", "telegram")))
 
     def parse(self, page: str) -> Iterator[LeadInput]:
         for chunk in page.split('data-post="')[1:]:
@@ -231,7 +233,7 @@ def configured_sources(cfg: Settings) -> list[OrderSource]:
     if "kwork" in enabled:
         sources.extend(KworkSource(url) for url in _split(cfg.kwork_projects_url))
     if "telegram" in enabled:
-        sources.extend(TelegramChannelSource(x) for x in cfg.telegram_channels.split(",") if x.strip())
+        sources.extend(TelegramChannelSource(x, cfg.telegram_api_url or "https://t.me") for x in cfg.telegram_channels.split(",") if x.strip())
     return sources
 
 

@@ -9,6 +9,7 @@ aiogram<4,>=3.13
 redis<7,>=5
 typer<1,>=0.12
 python-multipart>=0.0.9
+aiohttp-socks>=0.8
 
 [dev]
 pytest<10,>=8

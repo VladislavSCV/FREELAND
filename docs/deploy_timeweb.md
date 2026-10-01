@@ -40,6 +40,20 @@ docker compose logs -f api worker certbot
 - При старте API регистрирует Telegram webhook `https://DOMAIN/api/v1/telegram/webhook`. Пока сертификат временный, Telegram не может доставить обновления и копит их у себя; после выпуска настоящего сертификата они придут сами. Проверить webhook: `curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo`.
 - Проверка: `https://DOMAIN/health` и `https://DOMAIN/docs`; в боте — `/status`.
 
+## Telegram на сервере в РФ
+
+С российских VPS `api.telegram.org` и `t.me` часто недоступны. Решение без зарубежного сервера — бесплатный Cloudflare Worker как зеркало:
+
+1. dash.cloudflare.com → Workers & Pages → Create → Worker → вставить код из `docker/telegram-proxy-worker.js` → Deploy.
+2. (Желательно) Settings → Variables: `ALLOWED_BOT_ID` = цифры токена до `:` — зеркало будет обслуживать только ваш бот.
+3. В `.env`: `TELEGRAM_API_URL=https://<имя>.<аккаунт>.workers.dev` и `TELEGRAM_MODE=polling`.
+
+Через это зеркало идут и запросы бота, и сбор публичных каналов (`/s/<канал>`). Проверка с сервера: `curl https://<worker>/bot<TOKEN>/getMe`.
+
+Альтернатива — исходящий прокси: `TELEGRAM_PROXY=http://user:pass@host:port` (или `socks5://…`), например зона Datacenter в Bright Data. Каналы тогда направьте через Bright Data: `BRIGHTDATA_SOURCES=kwork,telegram`.
+
+Режим webhook требует, чтобы серверы Telegram могли достучаться до вашего сервера; если это блокируется, используйте polling — ему нужен только исходящий доступ.
+
 ## 4. Платёжные webhooks (когда подключите эквайринг)
 
 - Prodamus: URL уведомлений `https://DOMAIN/api/v1/webhooks/prodamus`, `PRODAMUS_SECRET_KEY` — секретный ключ из кабинета. В ссылке на оплату передавайте `order_num=project-<id>`.

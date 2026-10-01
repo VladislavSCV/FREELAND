@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_allowed_user_ids: str = Field(default="", validation_alias=AliasChoices("ALLOWED_TELEGRAM_IDS", "TELEGRAM_ALLOWED_USER_IDS"))
     telegram_mode: str = "webhook"
+    # For servers where api.telegram.org is unreachable: a Bot API mirror (e.g. a Cloudflare Worker)
+    # and/or an outgoing proxy (http://user:pass@host:port or socks5://...).
+    telegram_api_url: str = ""
+    telegram_proxy: str = ""
     telegram_webhook_secret: str = ""
     webhook_domain: str = ""
     llm_provider: str = "mock"

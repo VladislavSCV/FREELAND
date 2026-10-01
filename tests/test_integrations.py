@@ -53,6 +53,17 @@ def test_telegram_webhook_validates_secret_and_user(client, telegram, monkeypatc
     assert fed == [42]
 
 
+def test_bot_uses_api_mirror_and_proxy(telegram, monkeypatch):
+    from app.telegram_ui import make_bot
+
+    assert make_bot().session.api.base.startswith("https://api.telegram.org")
+    monkeypatch.setattr(telegram, "telegram_api_url", "https://tg.example.workers.dev/")
+    monkeypatch.setattr(telegram, "telegram_proxy", "http://user:pass@proxy.example:8080")
+    bot = make_bot()
+    assert bot.session.api.api_url(TOKEN, "getMe") == f"https://tg.example.workers.dev/bot{TOKEN}/getMe"
+    assert bot.session.proxy == "http://user:pass@proxy.example:8080"
+
+
 def test_webhook_secret_derives_from_bot_token(telegram):
     assert len(telegram.webhook_secret()) == 64
     assert TOKEN not in telegram.webhook_secret()

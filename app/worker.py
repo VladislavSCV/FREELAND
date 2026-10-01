@@ -36,9 +36,10 @@ async def tick():
         due = db.scalars(select(FollowUp).where(FollowUp.status == "PENDING", FollowUp.due_at <= now(), FollowUp.notified_at.is_(None)).limit(20)).all()
         if not settings().telegram_bot_token or not settings().allowed_ids():
             return
-        from aiogram import Bot
         from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-        async with Bot(settings().telegram_bot_token) as bot:
+
+        from app.telegram_ui import make_bot
+        async with make_bot() as bot:
             await notify_applications(db, bot)
             await deliver_reports(db, bot)
             for followup in due:

@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.config import settings
+
 
 class LeadInput(BaseModel):
     external_id: str | None = Field(default=None, max_length=255)
@@ -16,7 +18,7 @@ class LeadInput(BaseModel):
     client_jobs_count: int | None = Field(default=None, ge=0)
     budget_min: float | None = Field(default=None, ge=0)
     budget_max: float | None = Field(default=None, ge=0)
-    currency: str = Field(default="USD", pattern="^[A-Z]{3}$")
+    currency: str = Field(default_factory=lambda: settings().default_currency, pattern="^[A-Z]{3}$")
     published_at: datetime | None = None
     raw_payload: dict = Field(default_factory=dict)
 

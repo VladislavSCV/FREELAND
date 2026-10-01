@@ -13,6 +13,9 @@ os.environ["AUTOPILOT_ENABLED"] = "false"
 os.environ["MANUAL_PAYMENT_MODE"] = "true"
 os.environ["DEFAULT_CURRENCY"] = "USD"
 os.environ["CURRENCY_RATES"] = "RUB=90,EUR=0.92"
+os.environ["DEFAULT_HOURLY_RATE"] = "45"
+os.environ["TELEGRAM_API_URL"] = ""
+os.environ["TELEGRAM_PROXY"] = ""
 
 import pytest
 from fastapi.testclient import TestClient

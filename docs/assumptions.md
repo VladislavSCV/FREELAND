@@ -22,6 +22,7 @@
 - Bright Data is optional and applies only to sources in `BRIGHTDATA_SOURCES` (default `kwork`; FL.ru RSS and t.me previews work directly and would only add cost). Preferred mode is the Web Unlocker API (`BRIGHTDATA_TOKEN` + `BRIGHTDATA_ZONE`); proxy mode (`BRIGHTDATA_PROXY_URL`) re-signs TLS, so it trusts `BRIGHTDATA_CA_CERT` or skips verification for those public-page requests.
 - Orders older than `SCRAPER_MAX_AGE_HOURS` are skipped. Duplicates are detected by `(source, external_id)`, a SHA-256 hash of normalized title+description (across all sources, so the same post in two channels becomes one lead), URL and description similarity. For leads with a platform ID, title-only matching is disabled because channel posts often share generic titles.
 - The default seed no longer creates demo leads (`freelance seed --demo` does).
+- Pricing defaults to rubles (`DEFAULT_CURRENCY=RUB`, 1500 ₽/h, ruble service catalog). The quoted price is max(LLM estimate, service minimum, hours × rate); when the client's budget is lower, the budget is quoted instead, never below the service minimum, and the Telegram card warns when our price exceeds the budget 1.5×. `freelance seed` switches untouched USD catalog defaults to rubles.
 - Catalog prices and `DEFAULT_HOURLY_RATE` are in `DEFAULT_CURRENCY`; for leads in another currency they are converted with `CURRENCY_RATES` (static, manually maintained). If a currency has no rate, catalog limits are not applied and the LLM price is used.
 
 ## Telegram webhook

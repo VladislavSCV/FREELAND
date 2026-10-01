@@ -171,8 +171,14 @@ async def analyze(db: Session, lead: Lead) -> LeadAnalysis:
         service = next((s for s in services if s.category == result.service_category), None)
         hours = result.estimated_hours
         # Catalog limits and the hourly rate are configured in DEFAULT_CURRENCY; skip them when no rate is known.
-        floors = [result.recommended_price, local(service.min_price) if service else None, local(hours * settings().default_hourly_rate)]
+        minimum = local(service.min_price) if service else None
+        floors = [result.recommended_price, minimum, local(hours * settings().default_hourly_rate)]
         price = max(value for value in floors if value is not None)
+        # Marketplace orders come with a budget: quote it when our estimate is higher,
+        # but never below the service minimum (the card then warns that the budget is too low).
+        budget = lead.budget_max or lead.budget_min
+        if budget and price > budget:
+            price = max(budget, minimum or 0)
         ceiling = local(service.max_price) if service else None
         if ceiling is not None:
             price = min(price, ceiling)

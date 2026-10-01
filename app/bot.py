@@ -31,7 +31,13 @@ from app.services.ai_evaluator import (
     skip_application,
 )
 from app.services.payments import manual_payment
-from app.telegram_ui import EDIT_MARKER, application_card, application_keyboard, status_text
+from app.telegram_ui import (
+    EDIT_MARKER,
+    application_card,
+    application_keyboard,
+    make_bot,
+    status_text,
+)
 
 log = logging.getLogger(__name__)
 dp = Dispatcher()
@@ -41,7 +47,7 @@ _bot: Bot | None = None
 def get_bot() -> Bot:
     global _bot
     if _bot is None:
-        _bot = Bot(settings().telegram_bot_token)
+        _bot = make_bot()
     return _bot
 
 

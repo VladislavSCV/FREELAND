@@ -1,0 +1,11 @@
+# Cloudflare Worker that mirrors the Telegram Bot API and t.me/s/ for servers in Russia.
+# Dashboard deploys do not need this file. For CLI deploys: cd docker && npx wrangler deploy
+# `name` must match the worker created in the dashboard, otherwise a second worker is created.
+name = "yellow-sea-7d43"
+main = "telegram-proxy-worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+# Digits before ":" in TELEGRAM_BOT_TOKEN; the worker serves only this bot.
+ALLOWED_BOT_ID = "8647410673"
