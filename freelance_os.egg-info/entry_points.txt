@@ -1,0 +1,2 @@
+[console_scripts]
+freelance = app.cli:cli

@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: freelance
+      POSTGRES_USER: freelance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-freelance}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U freelance"]
+      interval: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+  api:
+    build: .
+    restart: always
+    env_file: .env
+    # Only nginx is public; the API port is bound to localhost for debugging on the server.
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: [reports:/code/reports]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 10s
+      retries: 12
+      start_period: 20s
+  worker:
+    build: .
+    restart: always
+    command: python -m app.worker
+    env_file: .env
+    volumes: [reports:/code/reports]
+    depends_on:
+      api: {condition: service_healthy}
+  # Long polling for local development without HTTPS: docker compose --profile polling up -d
+  bot:
+    build: .
+    profiles: [polling]
+    restart: unless-stopped
+    command: python -m app.bot
+    env_file: .env
+    environment:
+      TELEGRAM_MODE: polling
+    depends_on:
+      api: {condition: service_healthy}
+  nginx:
+    build: docker/nginx
+    restart: always
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    depends_on:
+      api: {condition: service_healthy}
+  certbot:
+    image: certbot/certbot:latest
+    restart: always
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:-}
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        trap exit TERM
+        while :; do
+          if [ "$$DOMAIN" != "localhost" ] && [ -n "$$LETSENCRYPT_EMAIL" ]; then
+            certbot certonly --webroot -w /var/www/certbot -d "$$DOMAIN" --email "$$LETSENCRYPT_EMAIL" \
+              --agree-tos --non-interactive --keep-until-expiring || echo "certbot failed; retrying later"
+          fi
+          # Retry soon until the first certificate exists, then check for renewal twice a day.
+          if [ -f "/etc/letsencrypt/live/$$DOMAIN/fullchain.pem" ]; then pause=12h; else pause=5m; fi
+          sleep $$pause & wait $$!
+        done
+    depends_on: [nginx]
+volumes:
+  postgres_data:
+  reports:
+  letsencrypt:
+  certbot_www:
