@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     # Pre-filter before the LLM: a scraped order needs an include word (title or text); an exclude word in the
     # title drops it unless the title also has an include word.
     # Words match at a word start, so "бот" matches "бота" but not "работа". Empty include list disables it.
-    scraper_include_keywords: str = "бот,telegram,телеграм,тг,python,питон,парс,скрипт,n8n,make.com,zapier,crm,амо,amocrm,битрикс,bitrix,интеграц,api,апи,webhook,вебхук,gpt,chatgpt,openai,yandexgpt,llm,нейросет,ии,ai,ai-,автоматизац,автоматиз,mini app,миниапп,fastapi,django,aiogram,лендинг,landing"
+    scraper_include_keywords: str = "бот,telegram,телеграм,тг,python,питон,парс,скрипт,crm,амо,amocrm,битрикс,bitrix,интеграц,api,апи,webhook,вебхук,gpt,chatgpt,openai,yandexgpt,llm,нейросет,ии,ai,ai-,автоматизац,автоматиз,mini app,миниапп,fastapi,django,aiogram,лендинг,landing,rag,langchain,crewai,pinecone,dify,мультиагент,база знаний,базы знаний,квалификация лидов,квалификации лидов,автоматизация продаж,чат-бот,docker,kubernetes,k8s,devops,ci/cd,cicd,gitlab,github actions,деплой,задеплоить,развернуть,развертыван,развёртыван,сервер,vps,vds,хостинг,nginx,linux,линукс,администрирован,мониторинг,grafana,prometheus,terraform,ansible,бэкап,резервн,ssl,ollama,vllm,gpu,облак,cloud"
     scraper_exclude_keywords: str = "логотип,дизайн,баннер,видео,монтаж,рилс,reels,прозвон,обзвон,звонк,копирайт,рерайт,статьи,статья,статей,smm,таргет,директ,seo,продвижен,перевод,озвуч,фотограф,иллюстрац,отзыв,1с,1c,unity,wordpress,figma"
     telegram_channels: str = ""
     brightdata_proxy_url: str = ""

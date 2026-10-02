@@ -43,6 +43,7 @@ from app.schemas import (
     ProjectUpdate,
     ProposalUpdate,
     ServiceInput,
+    ServiceUpdate,
 )
 from app.services import (
     analyze,
@@ -383,6 +384,19 @@ def add_service(item: ServiceInput, db: DB, _: Auth):
     db.add(row)
     db.commit()
     return obj(row)
+
+
+@app.patch("/api/v1/services/{category}")
+def update_service(category: str, item: ServiceUpdate, db: DB, _: Auth):
+    service = db.scalar(select(Service).where(Service.category == category))
+    if not service:
+        raise HTTPException(404, "Service not found")
+    for key, value in item.model_dump(exclude_unset=True).items():
+        setattr(service, key, value or None if key == "demo_url" else value)
+    if not service.min_price <= service.base_price <= service.max_price:
+        raise HTTPException(422, "Invalid price range")
+    db.commit()
+    return obj(service)
 
 
 @app.post("/api/v1/ingestion/webhook/{source}")

@@ -309,6 +309,53 @@ def test_price_follows_budget_but_not_below_minimum(db, catalog, cfg):
     assert price_for(5000) == 450
 
 
+def test_proposal_links_and_demo(client, db, catalog, cfg):
+    from app.services import strip_unknown_links
+
+    assert strip_unknown_links("Демо: https://demo.example/bot. Ещё https://fake.example/x тут.", {"https://demo.example/bot"}) == "Демо: https://demo.example/bot. Ещё тут."
+    assert strip_unknown_links("Без ссылок.", set()) == "Без ссылок."
+    from app.services import with_demo
+    assert with_demo("Текст.", "https://demo.example/bot") == "Текст.\n\nПример похожего решения: https://demo.example/bot"
+    assert with_demo("Демо https://demo.example/bot", "https://demo.example/bot") == "Демо https://demo.example/bot"
+    assert with_demo("Текст.", "") == "Текст."
+    response = client.patch("/api/v1/services/TELEGRAM_BOT", json={"demo_url": "https://demo.example/bot"})
+    assert response.status_code == 200 and response.json()["demo_url"] == "https://demo.example/bot"
+    assert client.patch("/api/v1/services/TELEGRAM_BOT", json={"demo_url": "javascript:alert(1)"}).status_code == 422
+    assert client.patch("/api/v1/services/TELEGRAM_BOT", json={"demo_url": ""}).json()["demo_url"] is None
+    assert client.patch("/api/v1/services/NOPE", json={"demo_url": ""}).status_code == 404
+
+
+def test_default_keywords_cover_devops_and_keep_existing():
+    from app.config import Settings
+    from app.workers.scraper import KeywordFilter
+
+    defaults = Settings(_env_file=None)
+    keywords = KeywordFilter(defaults.scraper_include_keywords, defaults.scraper_exclude_keywords)
+
+    def ok(title, text="описание"):
+        return keywords.accepts(LeadInput(source="t", title=title, description=text))
+    for title in ["Настроить VPS и задеплоить проект", "Перенести сайт на хостинг", "Настройка CI/CD в GitLab", "Docker Compose для сервиса", "Развернуть Ollama на сервере", "Мониторинг Grafana + Prometheus", "Telegram-бот для записи", "Интеграция amoCRM со СДЭК", "Лендинг для школы"]:
+        assert ok(title), title
+    assert not ok("Логотип для кофейни")
+
+
+def test_model_reject_archives_even_with_passing_score(db, catalog, cfg, monkeypatch):
+    from app.llm import MockProvider
+
+    original = MockProvider.structured_generate
+
+    async def rejecting(self, system, data, schema):
+        result = await original(self, system, data, schema)
+        if "services" in data:
+            result.recommended_action = "REJECT"
+        return result
+
+    monkeypatch.setattr(MockProvider, "structured_generate", rejecting)
+    application = asyncio.run(evaluate(db, lead(db, "Обновить 1С на сервере", "Обновить платформу 1С на сервере и клиентах")))
+    assert application.score >= cfg.review_score
+    assert application.status == "ARCHIVED" and not application.proposal_draft
+
+
 def test_project_model_defaults(db):
     row = lead(db)
     project = Project(lead_id=row.id, name="x", service_category="TELEGRAM_BOT", contract_price=100, currency="USD", estimated_hours=1)

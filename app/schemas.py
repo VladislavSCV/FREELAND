@@ -110,6 +110,17 @@ class ServiceInput(BaseModel):
     required_skills: list[str] = Field(default_factory=list)
     margin_target: float = Field(default=.3, ge=0, le=1)
     proposal_template: str = ""
+    demo_url: str | None = Field(default=None, max_length=1000, pattern=r"^https?://\S+$")
+
+
+class ServiceUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=5000)
+    base_price: float | None = Field(default=None, ge=0)
+    min_price: float | None = Field(default=None, ge=0)
+    max_price: float | None = Field(default=None, ge=0)
+    typical_hours: float | None = Field(default=None, gt=0)
+    demo_url: str | None = Field(default=None, max_length=1000, pattern=r"^(https?://\S+)?$")
 
 
 class AgencyProfileInput(BaseModel):

@@ -44,7 +44,8 @@ async def evaluate(db: Session, lead: Lead) -> Application:
         reason = analysis.match_reason or (analysis.reasoning[0] if analysis.reasoning else "")
         application = Application(lead_id=lead.id, score=score, match_reason=reason, status="PROPOSAL_PENDING", decision="auto")
         db.add(application)
-        if score < cfg.review_score:
+        # The model's explicit REJECT (outside the profile, a "не делаем" item) wins over the weighted score.
+        if score < cfg.review_score or analysis.recommended_action == "REJECT":
             application.status = "ARCHIVED"
             transition(lead, "ARCHIVED")
             db.flush()

@@ -140,6 +140,25 @@ def close_project(project: Project, feedback: str | None = None):
     project.postmortem = {"estimated_hours": project.estimated_hours, "actual_hours": project.actual_hours, "hour_variance": round(project.actual_hours - project.estimated_hours, 2), "profit": project.profit, "effective_hourly_rate": round(project.profit / project.actual_hours, 2) if project.actual_hours else None, "client_feedback": feedback or "", "lesson": "Review estimate against actual hours" if project.actual_hours > project.estimated_hours else "Estimate was within budget", "ai_status": "PENDING"}
 
 
+URL_RE = re.compile(r"https?://[^\s)>\]]+")
+
+
+def strip_unknown_links(body: str, allowed: set[str]) -> str:
+    """The model must not invent links: keep only configured demo URLs, drop sentences' other URLs."""
+    def keep(match: re.Match) -> str:
+        url = match.group(0).rstrip(".,;:!?")
+        return match.group(0) if url in allowed else ""
+    cleaned = URL_RE.sub(keep, body)
+    return re.sub(r"[ \t]+([.,;:!?])", r"\1", re.sub(r"[ \t]{2,}", " ", cleaned)).strip()
+
+
+def with_demo(body: str, demo_url: str) -> str:
+    """Models often skip the demo link; append it deterministically when the service has one."""
+    if not demo_url or demo_url in body:
+        return body
+    return f"{body.rstrip()}\n\nПример похожего решения: {demo_url}"
+
+
 def prompt(db: Session, name: str) -> str:
     from app.models import PromptVersion
     row = db.scalar(select(PromptVersion).where(PromptVersion.prompt_name == name, PromptVersion.active == True).order_by(PromptVersion.version.desc()))
@@ -184,7 +203,7 @@ async def analyze(db: Session, lead: Lead) -> LeadAnalysis:
             price = min(price, ceiling)
         econ = economics(hours, price)
         overall = score(result, client_known=lead.client_rating is not None or bool(lead.client_jobs_count))
-        analysis = LeadAnalysis(lead_id=lead.id, service_category=result.service_category, fit_score=result.fit_score, profit_score=result.profit_score, complexity_score=result.complexity_score, risk_score=result.risk_score, client_quality_score=result.client_quality_score, overall_score=overall, estimated_hours=hours, estimated_cost=econ["estimated_external_cost"], recommended_price=price, estimated_profit=econ["estimated_profit"], effective_hourly_rate=econ["effective_hourly_rate"], recommended_action="APPLY" if result.fit_score >= settings().min_fit_score and result.profit_score >= settings().min_profit_score and overall >= 70 else "MAYBE" if overall >= 50 else "REJECT", match_reason=result.match_reason, reasoning=result.reasons, risks=result.risks, missing_information=result.missing_information, required_skills=result.required_skills)
+        analysis = LeadAnalysis(lead_id=lead.id, service_category=result.service_category, fit_score=result.fit_score, profit_score=result.profit_score, complexity_score=result.complexity_score, risk_score=result.risk_score, client_quality_score=result.client_quality_score, overall_score=overall, estimated_hours=hours, estimated_cost=econ["estimated_external_cost"], recommended_price=price, estimated_profit=econ["estimated_profit"], effective_hourly_rate=econ["effective_hourly_rate"], recommended_action="REJECT" if result.recommended_action == "REJECT" else "APPLY" if result.fit_score >= settings().min_fit_score and result.profit_score >= settings().min_profit_score and overall >= 70 else "MAYBE" if overall >= 50 else "REJECT", match_reason=result.match_reason, reasoning=result.reasons, risks=result.risks, missing_information=result.missing_information, required_skills=result.required_skills)
         db.add(analysis)
         transition(lead, "ANALYZED")
         if analysis.recommended_action == "APPLY":
@@ -206,9 +225,10 @@ async def generate_proposal(db: Session, lead: Lead) -> Proposal:
     profile = db.scalar(select(AgencyProfile).limit(1))
     service = db.scalar(select(Service).where(Service.category == analysis.service_category))
     cases = db.scalars(select(CaseStudy).where(CaseStudy.service == analysis.service_category).limit(3)).all()
-    context = {"lead": {"title": lead.title, "description": lead.description, "client_name": lead.client_name}, "analysis": {"reasoning": analysis.reasoning, "risks": analysis.risks, "missing_information": analysis.missing_information, "recommended_price": analysis.recommended_price}, "agency_profile": {"name": profile.name, "description": profile.description, "skills": profile.skills} if profile else {}, "service": {"name": service.name, "description": service.description} if service else {}, "relevant_case_studies": [{"title": case.title, "problem": case.problem, "solution": case.solution, "result": case.result} for case in cases], "pricing_rules": {"price": analysis.recommended_price, "currency": lead.currency}}
+    demo_url = service.demo_url if service and service.demo_url else ""
+    context = {"lead": {"title": lead.title, "description": lead.description, "client_name": lead.client_name}, "analysis": {"reasoning": analysis.reasoning, "risks": analysis.risks, "missing_information": analysis.missing_information, "recommended_price": analysis.recommended_price}, "agency_profile": {"name": profile.name, "description": profile.description, "skills": profile.skills} if profile else {}, "service": {"category": service.category, "name": service.name, "description": service.description, "demo_url": demo_url} if service else {"demo_url": ""}, "relevant_case_studies": [{"title": case.title, "problem": case.problem, "solution": case.solution, "result": case.result} for case in cases], "pricing_rules": {"price": analysis.recommended_price, "currency": lead.currency}}
     result = await observed_generate(db, "proposal_generation", prompt(db, "proposal_generation"), context, ProposalResult)
-    proposal = Proposal(lead_id=lead.id, body=result.body, price=analysis.recommended_price, currency=lead.currency, estimated_delivery_days=result.delivery_estimate, questions=result.questions, approach=result.approach, assumptions=result.assumptions)
+    proposal = Proposal(lead_id=lead.id, body=with_demo(strip_unknown_links(result.body, {demo_url} - {""}), demo_url), price=analysis.recommended_price, currency=lead.currency, estimated_delivery_days=result.delivery_estimate, questions=result.questions, approach=result.approach, assumptions=result.assumptions)
     db.add(proposal)
     transition(lead, "PROPOSAL_READY")
     db.flush()

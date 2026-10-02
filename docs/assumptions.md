@@ -44,3 +44,15 @@
 - `DATABASE_URL` with `postgresql+asyncpg://` (as in the deploy template) is accepted and converted to the synchronous psycopg driver the app uses.
 - The API applies Alembic migrations on start. Revision 0002 is idempotent because 0001 builds the schema from the current models.
 - nginx starts with a temporary self-signed certificate and switches to Let's Encrypt automatically once certbot (webroot challenge) issues it.
+
+## Proposals (B2B focus)
+
+- Proposals lead with the business outcome (less manual work, faster replies, data in CRM) and mention only skills relevant to the task; the prompt forbids invented numbers, cases and SLA promises.
+- A service's `demo_url` (set with `/demo` or `PATCH /api/v1/services/{category}`) is appended to its proposals as «Пример похожего решения: …». Any other URL the model writes is removed, so links cannot be invented.
+- Telegram channels were checked on 2026-10-02: of the suggested ones only `zakazy_it` is public and active; `work_in_it` stopped in 2023, `workforindie` and `ai_developers_jobs` do not exist publicly.
+
+## Services and profile (DevOps / AI infra)
+
+- Catalog: AI_AUTOMATION, TELEGRAM_BOT, LANDING_PAGE plus DEVOPS_INFRA (servers, Docker, CI/CD, hosting moves, Nginx/SSL, monitoring, backups, Kubernetes, Terraform/Ansible; 5 000–150 000 ₽) and AI_INFRA (self-hosted LLM with Ollama/vLLM, RAG, GPU servers; 20 000–300 000 ₽). The LLM chooses the category from the Russian service descriptions; `seed` fills descriptions that still equal the service name and never overwrites edited ones.
+- n8n / Make / Zapier are out of scope (a «не делаем» item): integrations are written in Python.
+- An explicit REJECT from the model (outside the profile or a «не делаем» item) archives the lead even when the weighted score reaches `REVIEW_SCORE`.

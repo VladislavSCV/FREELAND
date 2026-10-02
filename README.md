@@ -24,7 +24,7 @@ FL.ru RSS / t.me/s/<channel> / Kwork  ──▶  NEW lead ──▶ LLM analysis
              score < REVIEW_SCORE ────────────────────────┴──▶ ARCHIVED
 ```
 
-Telegram commands: `/status` (today's summary), `/autopilot on|off`, `/pay_project <project_id> <amount>`, `/dashboard`, `/leads`, `/pending`, `/newlead`, `/proposals`, `/projects`, `/hours`, `/stats`. «Редактировать» asks you to reply with the new text. Pasted order text can be saved as a lead and is evaluated automatically.
+Telegram commands: `/status` (today's summary), `/autopilot on|off`, `/pay_project <project_id> <amount>`, `/demo [<CATEGORY> <url>|-]` (demo link added to proposals of that service), `/dashboard`, `/leads`, `/pending`, `/newlead`, `/proposals`, `/projects`, `/hours`, `/stats`. «Редактировать» asks you to reply with the new text. Pasted order text can be saved as a lead and is evaluated automatically.
 
 Thresholds and sources are configured in `.env` (`AUTOPILOT_THRESHOLD`, `REVIEW_SCORE`, `AUTOPILOT_ENABLED`, `SCRAPER_SOURCES`, `TELEGRAM_CHANNELS`, `BRIGHTDATA_*`). Run one scrape manually with `make scrape`. API: `GET /api/v1/applications`, `GET|POST /api/v1/autopilot[/on|off]`.
 

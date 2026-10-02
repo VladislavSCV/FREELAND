@@ -58,7 +58,8 @@ class HTTPProvider:
 
     async def generate(self, system: str, data: dict, schema: dict | None = None) -> str:
         payload = json.dumps(data, ensure_ascii=False)
-        async with httpx.AsyncClient(timeout=45) as client:
+        # Yandex AI Studio occasionally needs more than 45 s for a full proposal.
+        async with httpx.AsyncClient(timeout=90) as client:
             if self.name == "anthropic":
                 response = await client.post(self.endpoint, headers={"x-api-key": self.key, "anthropic-version": "2023-06-01"}, json={"model": self.model, "max_tokens": 1600, "system": system, "messages": [{"role": "user", "content": payload}]})
                 _check(response)
@@ -90,7 +91,7 @@ class HTTPProvider:
                 last_error = error
                 if attempt < 2:
                     await asyncio.sleep(2 ** attempt)
-        raise RuntimeError(f"LLM request failed: {last_error}")
+        raise RuntimeError(f"LLM request failed: {type(last_error).__name__}: {last_error}")
 
 
 class MockProvider:

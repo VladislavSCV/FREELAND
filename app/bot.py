@@ -18,7 +18,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.db import SessionLocal
 from app.main import conversion, create_project, dashboard, revenue, update_project
-from app.models import Application, FollowUp, Lead, Project, Proposal
+from app.models import Application, FollowUp, Lead, Project, Proposal, Service
 from app.schemas import LeadInput, ProjectInput, ProjectUpdate
 from app.services import analyze, approve, create_lead, generate_proposal, mark_sent, transition
 from app.services.ai_evaluator import (
@@ -64,7 +64,7 @@ def buttons(lead: Lead) -> InlineKeyboardMarkup:
 @dp.message(Command("start", "help"))
 async def help_handler(message: Message):
     if allowed(message):
-        await message.answer("/status — сводка за день\n/autopilot on|off — автопилот\n/pay_project <project_id> <amount> — отметить оплату\n/dashboard /leads /newlead <title> | <description> /pending /proposals /projects /hours <project_id> <hours> /stats\nМожно просто вставить текст заказа.")
+        await message.answer("/status — сводка за день\n/autopilot on|off — автопилот\n/pay_project <project_id> <amount> — отметить оплату\n/demo — демо-ссылки для откликов\n/dashboard /leads /newlead <title> | <description> /pending /proposals /projects /hours <project_id> <hours> /stats\nМожно просто вставить текст заказа.")
 
 
 DASHBOARD_LABELS = {"lead_count": "Заказов всего", "new_today": "Новых сегодня", "qualified": "Квалифицировано", "proposal_count": "Откликов всего", "proposals_ready": "Черновиков на проверке", "sent": "Отправлено", "replies": "Ответов", "won": "Выиграно", "pipeline": "В работе (сумма откликов)", "revenue": "Выручка", "profit": "Прибыль", "hours": "Часов", "paid": "Оплачено"}
@@ -202,6 +202,28 @@ async def autopilot_handler(message: Message):
         detail = f"Все заказы с оценкой ≥ {cfg.review_score}/10 приходят на проверку."
     usage = "" if argument in {"on", "off"} else "\nИспользование: /autopilot on|off"
     await message.answer(f"Автопилот {'🟢 включён' if enabled else '⚪️ выключен'}. {detail}{usage}")
+
+
+@dp.message(Command("demo"))
+async def demo_handler(message: Message):
+    """/demo — list services; /demo <CATEGORY> <url> — set a demo link; /demo <CATEGORY> - — remove it."""
+    if not allowed(message):
+        return
+    parts = (message.text or "").split()
+    with SessionLocal() as db:
+        if len(parts) == 3:
+            service = db.scalar(select(Service).where(Service.category == parts[1].upper()))
+            if service is None:
+                await message.answer("Нет такой услуги. Список: /demo")
+                return
+            if parts[2] != "-" and not re.fullmatch(r"https?://\S{3,990}", parts[2]):
+                await message.answer("Ссылка должна начинаться с http:// или https://")
+                return
+            service.demo_url = None if parts[2] == "-" else parts[2]
+            db.commit()
+        services = db.scalars(select(Service).order_by(Service.category)).all()
+        lines = [f"{s.category}: {s.demo_url or '—'}" for s in services]
+    await message.answer("Демо-ссылки для откликов:\n" + "\n".join(lines) + "\n\nЗадать: /demo TELEGRAM_BOT https://…\nУбрать: /demo TELEGRAM_BOT -")
 
 
 @dp.message(Command("pay_project"))

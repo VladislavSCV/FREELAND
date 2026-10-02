@@ -157,6 +157,8 @@ class Service(Base):
     required_skills: Mapped[list] = mapped_column(JSON, default=list)
     margin_target: Mapped[float] = mapped_column(Float, default=0.3)
     proposal_template: Mapped[str] = mapped_column(Text, default="")
+    # Link to a live demo of this service; proposals mention it only when set.
+    demo_url: Mapped[str | None] = mapped_column(String(1000))
 
 
 class AgencyProfile(Base):
