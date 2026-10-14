@@ -20,7 +20,15 @@ from app.db import SessionLocal
 from app.main import conversion, create_project, dashboard, revenue, update_project
 from app.models import Application, FollowUp, Lead, Project, Proposal, Service
 from app.schemas import LeadInput, ProjectInput, ProjectUpdate
-from app.services import analyze, approve, create_lead, generate_proposal, mark_sent, transition
+from app.services import (
+    analyze,
+    approve,
+    audit,
+    create_lead,
+    generate_proposal,
+    mark_sent,
+    transition,
+)
 from app.services.ai_evaluator import (
     approve_application,
     autopilot_enabled,
@@ -266,6 +274,64 @@ async def edit_reply_handler(message: Message):
         lead = db.get(Lead, application.lead_id)
         proposal = db.get(Proposal, application.proposal_id) if application.proposal_id else None
         await message.answer(application_card(lead, application, proposal.price if proposal else None), parse_mode="HTML", reply_markup=application_keyboard(lead, application))
+
+
+_outreach_in_flight: set[int] = set()
+
+
+@dp.callback_query(F.data.regexp(r"^dm_\d+$"))
+async def outreach_handler(callback: CallbackQuery):
+    """«Откликнуться»: send the proposal to the client's Telegram from the user's own account."""
+    if not allowed(callback):
+        return
+    from app.services.outreach import (
+        OutreachLimitError,
+        check_limits,
+        compose_message,
+        lead_contact,
+        outreach_ready,
+        send_message,
+    )
+
+    application_id = int(callback.data.split("_")[1])
+    if application_id in _outreach_in_flight:
+        await callback.answer("Уже отправляю…")
+        return
+    with SessionLocal() as db:
+        application = db.get(Application, application_id)
+        lead = db.get(Lead, application.lead_id) if application else None
+        if application is None or lead is None or application.status not in {"PENDING_REVIEW", "APPROVED"}:
+            await callback.answer("Заявка уже обработана", show_alert=True)
+            return
+        contact = lead_contact(lead)
+        if not contact or not outreach_ready():
+            await callback.answer("Для этого заказа автоотправка недоступна — откликнитесь вручную", show_alert=True)
+            return
+        try:
+            check_limits(db, settings())
+        except OutreachLimitError as error:
+            await callback.answer(str(error)[:180], show_alert=True)
+            return
+        _outreach_in_flight.add(application_id)
+        try:
+            await callback.answer(f"Отправляю @{contact}…")
+            result = await send_message(contact, compose_message(lead, application.proposal_draft))
+            if not result.ok:
+                await callback.message.answer(f"⚠️ Не отправлено: {result.detail}")
+                return
+            if application.status == "PENDING_REVIEW":
+                approve_application(db, application)
+            mark_application_sent(db, application)
+            audit(db, "application", application.id, "outreach_sent", {"to": contact})
+            db.commit()
+        finally:
+            _outreach_in_flight.discard(application_id)
+        proposal = db.get(Proposal, application.proposal_id) if application.proposal_id else None
+        text = f"✅ Отклик отправлен в Telegram @{contact}\n\n" + application_card(lead, application, proposal.price if proposal else None)
+        try:
+            await callback.message.edit_text(text[:4096], parse_mode="HTML", reply_markup=application_keyboard(lead, application))
+        except TelegramBadRequest:
+            log.warning("Could not update application card %s", application.id)
 
 
 @dp.callback_query(F.data.regexp(r"^(approve|edit|reject|sent)_\d+$"))

@@ -356,6 +356,44 @@ def test_model_reject_archives_even_with_passing_score(db, catalog, cfg, monkeyp
     assert application.status == "ARCHIVED" and not application.proposal_draft
 
 
+IT_ZAKAZY_PAGE = """<div class="tgme_widget_message js-widget_message" data-post="it_zakazy/501">
+<div class="tgme_widget_message_text js-message_text" dir="auto">📁 Скрипты, боты и mini apps | 💰 200 000 ₽ | ⏰ 10 дн.<br/>Telegram-бот для записи с оплатой<br/>Нужен бот на aiogram с оплатой и админкой.<br/>📨 5 предл.<br/><a href="https://kwork.ru/projects/3299001/view">🔗 Открыть на Kwork</a></div>
+<time datetime="2026-10-14T07:18:04+00:00"></time></div>
+<div class="tgme_widget_message js-widget_message" data-post="it_zakazy/502">
+<div class="tgme_widget_message_text js-message_text" dir="auto">📁 Скрипты, боты и mini apps | 💰 1 500 ₽ | ⏰ 2 дн.<br/>Простой парсер сайта<br/>Спарсить 100 товаров в таблицу, нужен python скрипт.</div>
+<time datetime="2026-10-14T08:00:00+00:00"></time></div>"""
+
+
+def test_kwork_mirror_channel_and_min_budget(db, monkeypatch):
+    from app.workers.scraper import KeywordFilter, worth_it
+
+    monkeypatch.setattr(settings(), "default_currency", "RUB")
+
+    first, second = TelegramChannelSource("it_zakazy").parse(IT_ZAKAZY_PAGE)
+    assert first.title == "Telegram-бот для записи с оплатой"
+    assert (first.budget_max, first.currency) == (200000, "RUB")
+    assert (first.source, first.external_id, first.url) == ("kwork", "3299001", "https://kwork.ru/projects/3299001")
+    assert second.source == "tg_it_zakazy" and second.budget_max == 1500
+    assert worth_it(first, 10000) and not worth_it(second, 10000) and worth_it(second, 0)
+    no_budget = LeadInput(source="t", title="Бот", description="Нужен бот")
+    assert worth_it(no_budget, 10000)
+    keywords = KeywordFilter("бот,парс,python", "")
+    assert store(db, [first, second], 10**6, keywords, min_budget=10000) == 1
+    # The same project arriving from the Kwork feed is recognised as known.
+    assert store(db, [LeadInput(source="kwork", external_id="3299001", title="Другой заголовок", description="Другой текст про бота")], 10**6, keywords) == 0
+
+
+def test_titles_skip_aggregator_meta_lines_and_uah_budget():
+    from app.workers.scraper import parse_budget, title_from
+
+    repost = "💬 📁 Скрипты, боты и mini apps | 💰 200 000 ₽ | ⏰ 10 дн.\n👥 Группа: @it_zakazy\nРазработка ИИ-инструмента для саун\nТекст"
+    assert title_from(repost) == "Разработка ИИ-инструмента для саун"
+    assert title_from("🆕 NEW PROJECT ON LABORX\n📢 Google Workspace Setup Specialist Needed\n💰 Budget: $40") == "Google Workspace Setup Specialist Needed"
+    assert title_from("Telegram-бот для записи\nописание") == "Telegram-бот для записи"
+    assert parse_budget("Бюджет: 5000 грн") == (5000, "UAH")
+    assert parse_budget("💰 Budget: $40") == (40, "USD")
+
+
 def test_project_model_defaults(db):
     row = lead(db)
     project = Project(lead_id=row.id, name="x", service_category="TELEGRAM_BOT", contract_price=100, currency="USD", estimated_hours=1)
@@ -424,3 +462,16 @@ def test_telegram_channels_use_mirror(monkeypatch):
 
     asyncio.run(source.fetch(Fetcher()))
     assert seen == ["https://tg.example.workers.dev/s/orders_ru"]
+
+
+def test_channel_post_classification():
+    from app.workers.channels import classify
+
+    def item(text):
+        return LeadInput(source="t", title=text.splitlines()[0], description=text)
+
+    assert classify(item("Нужно сделать Telegram-бота\nБюджет 30 000 ₽, сроки 10 дней")) == "order"
+    assert classify(item("Looking for a developer to build a scraper\nBudget: $500 fixed price")) == "order"
+    assert classify(item("Вакансия: Senior DevOps\nПолная занятость, оклад 300к, ДМС")) == "vacancy"
+    assert classify(item("Company name: Acme\nTitle: SRE\nGrades: senior\nRemote: Yes")) == "vacancy"
+    assert classify(item("Гугл запустил новую нейросеть, рассказываем подробности")) == "other"

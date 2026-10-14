@@ -75,6 +75,51 @@ def reevaluate_command(all_archived: bool = typer.Option(False, "--all", help="I
         typer.echo(f"Requeued {reevaluate_archived(db, accepts)} leads; the worker evaluates them within a few minutes")
 
 
+@cli.command("channels-check")
+def channels_check(channels: list[str]):
+    """Check public Telegram channels: alive, posting project orders (not vacancies), passing the filter."""
+    from app.config import settings
+    from app.workers.channels import check_channels
+    from app.workers.scraper import Fetcher, KeywordFilter
+
+    cfg = settings()
+    keywords = KeywordFilter(cfg.scraper_include_keywords, cfg.scraper_exclude_keywords)
+
+    async def run():
+        fetcher = Fetcher(cfg)
+        try:
+            return await check_channels([c for arg in channels for c in arg.replace(",", " ").split()], fetcher,
+                                        keywords, cfg.telegram_api_url or "https://t.me")
+        finally:
+            await fetcher.aclose()
+
+    typer.echo("канал | вердикт | постов за 7 дн | заказов | вакансий | подходящих заказов | последний пост")
+    for r in asyncio.run(run()):
+        last = f"{r.last_post:%Y-%m-%d}" if r.last_post else "-"
+        typer.echo(f"{r.channel} | {r.verdict} | {r.week_posts} | {r.week_orders} | {r.week_vacancies} | {r.week_relevant_orders} | {last} | {' / '.join(r.examples)}")
+
+
+@cli.command("tg-login")
+def tg_login():
+    """One-time login to your Telegram account for one-click proposals; prints TG_USER_SESSION.
+
+    Run interactively: docker compose run --rm api freelance tg-login"""
+    from telethon.sessions import StringSession
+    from telethon.sync import TelegramClient
+
+    from app.config import settings
+    from app.services.outreach import proxy_options
+
+    cfg = settings()
+    if not cfg.tg_user_api_id or not cfg.tg_user_api_hash:
+        raise typer.BadParameter("Set TG_USER_API_ID and TG_USER_API_HASH (my.telegram.org -> API development tools)")
+    with TelegramClient(StringSession(), cfg.tg_user_api_id, cfg.tg_user_api_hash, **proxy_options(cfg.tg_user_proxy)) as client:
+        me = client.get_me()
+        typer.echo(f"\nВход выполнен: {me.first_name} (@{me.username}).")
+        typer.echo("Добавьте строку в .env и никому её не показывайте — это полный доступ к аккаунту:\n")
+        typer.echo(f"TG_USER_SESSION={client.session.save()}")
+
+
 @cli.command("scrape")
 def scrape_command():
     """Run one scraping pass over the configured sources."""

@@ -56,3 +56,29 @@
 - Catalog: AI_AUTOMATION, TELEGRAM_BOT, LANDING_PAGE plus DEVOPS_INFRA (servers, Docker, CI/CD, hosting moves, Nginx/SSL, monitoring, backups, Kubernetes, Terraform/Ansible; 5 000–150 000 ₽) and AI_INFRA (self-hosted LLM with Ollama/vLLM, RAG, GPU servers; 20 000–300 000 ₽). The LLM chooses the category from the Russian service descriptions; `seed` fills descriptions that still equal the service name and never overwrites edited ones.
 - n8n / Make / Zapier are out of scope (a «не делаем» item): integrations are written in Python.
 - An explicit REJECT from the model (outside the profile or a «не делаем» item) archives the lead even when the weighted score reaches `REVIEW_SCORE`.
+
+## Sources checked 2026-10-06
+
+- FL.ru RSS feeds in use: categories 5 (programming), 2 (websites), 31 (AI), 41 (business automation), 34 (messengers). The same order in several feeds is stored once (same FL.ru project ID).
+- Not connected: Habr Freelance closed permanently (RSS returns 410 «Сервис Хабр Фриланс закрылся навсегда»); TenChat renders orders with JavaScript behind login; Telegram channels freelansim_ru (silent since 2025-02), work_in_it (since 2023), it_orders (one post), ai_developers_jobs, prompt_engineering_jobs, workforindie, finder_vc (no public channel).
+
+## Sources and quality filter (2026-10-14)
+
+- FL.ru is off by default (`SCRAPER_SOURCES=kwork,telegram`): proposals there are paid.
+- Telegram channels checked on 2026-10-14 (about 60 candidates): only `it_zakazy` (mirrors Kwork projects of all categories with budgets) and `zakazy_it` publish project orders. Active foreign channels (`remote_devops_jobs`, `remote_python_jobs`, `remotejobshg`, `Getitrussia`) post full-time vacancies, not projects, so they are not connected by default.
+- A Telegram post that links a Kwork project is stored as that Kwork project (source `kwork`, project ID), so it merges with the Kwork feed. When kwork.ru is unreachable from the server, Kwork orders still arrive through the mirror channel.
+- Orders with a stated budget below `MIN_BUDGET` (10 000 ₽ by default) are dropped before the LLM; orders without a budget are judged by the LLM. `REVIEW_SCORE` defaults to 6.
+
+## Telegram channels (re-checked 2026-10-14, ~180 candidates)
+
+- Connected (post project orders): `it_zakazy` (Kwork mirror), `zakazy_it`, `freelance_gigs` (aggregator of order groups such as @freelance_zakazy), `freelancehuntprojects` (Freelancehunt, RU/UA, budgets in UAH/EUR), `laborx` (international, English, USD).
+- Rejected: vacancy channels (`remote_devops_jobs`, `remote_python_jobs`, `remotejobshg`, `getitrussia`, `JobOfferInside`, `hiddengurus`, `web3hiring`, `cryptojobslist`, `geekjobs`, `Remoteit`, …), off-profile (`workk_on`: SMM/video), abandoned (`freelanceru`, `kwork_projects`, `upworkfeed`, `workzilla`, …) and about 100 non-existent names from SEO listicles.
+- `freelance channels-check <names>` re-checks any channel: alive, orders vs vacancies, how many pass the filter.
+
+## One-click proposals via Telegram (2026-10-14)
+
+- For orders from Telegram channels that contain the client's contact, the card shows «🚀 Откликнуться: написать @username». Pressing it sends «Здравствуйте! Пишу по вашему заказу «…»» plus the proposal from the user's own account (Telethon user session) and marks the application SENT. Nothing is sent without the press.
+- Safety: at most `TG_OUTREACH_DAILY_LIMIT` messages per 24 h and `TG_OUTREACH_MIN_INTERVAL_SECONDS` between them; FloodWait/PeerFlood/privacy errors leave the card for manual sending. Double presses are ignored.
+- Contact detection skips the source channel/group, bots, and usernames repeated in 3+ posts of a channel (admin/ads signatures). Kwork mirror posts never get the button: they are answered on Kwork. Kwork/FL.ru/LaborX/Freelancehunt are not automated.
+- `TG_USER_SESSION` gives full access to the account; it lives only in the server `.env`. MTProto goes to Telegram data centers directly, so a server in Russia may need `TG_USER_PROXY` (socks5/http/mtproxy).
+- Checked on live channels: the connected channels currently publish no client contacts (Kwork mirror, platform feeds, reposts without authors), so the button appears only for posts that do include one.

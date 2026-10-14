@@ -28,6 +28,14 @@ DESCRIPTIONS = {
     "DEVOPS_INFRA": "DevOps и администрирование: настройка VPS и Linux-серверов, Docker и Compose, CI/CD, деплой и перенос проекта на хостинг, Nginx и SSL, мониторинг (Prometheus, Grafana), бэкапы, Kubernetes, Terraform, Ansible",
     "AI_INFRA": "AI-инфраструктура: развёртывание LLM на своём сервере (Ollama, vLLM), RAG с векторной базой, GPU-серверы, API и мониторинг для моделей",
 }
+# Live demos and portfolio projects appended to proposals of each service. `seed` fills them only when a
+# service has no demo yet, so links changed with /demo are kept.
+DEMO_URLS = {
+    "TELEGRAM_BOT": "https://t.me/system676_bot?start=booking",
+    "AI_AUTOMATION": "https://t.me/system676_bot?start=sales",
+    "DEVOPS_INFRA": "https://github.com/VladislavSCV/devops-service-template",
+    "AI_INFRA": "https://github.com/VladislavSCV/selfhosted-llm-rag",
+}
 CATALOG_RUB = [("AI_AUTOMATION", "AI automation", 30000, 12000, 400000, 12), ("TELEGRAM_BOT", "Telegram bot", 25000, 10000, 300000, 10), ("LANDING_PAGE", "Landing page", 15000, 7000, 200000, 8), ("DEVOPS_INFRA", "DevOps / infrastructure", 15000, 5000, 150000, 6), ("AI_INFRA", "AI infrastructure", 50000, 20000, 300000, 16)]
 CATALOG_USD = [("AI_AUTOMATION", "AI automation", 600, 300, 5000, 12), ("TELEGRAM_BOT", "Telegram bot", 450, 250, 4000, 10), ("LANDING_PAGE", "Landing page", 350, 200, 3000, 8), ("DEVOPS_INFRA", "DevOps / infrastructure", 200, 60, 2000, 6), ("AI_INFRA", "AI infrastructure", 600, 250, 4000, 16)]
 OLD_USD_PRICES = {(base, minimum, maximum) for _, _, base, minimum, maximum, _ in CATALOG_USD}
@@ -47,8 +55,10 @@ def seed(demo: bool = False):
         for category, name, base, minimum, maximum, hours in catalog:
             service = db.scalar(select(Service).where(Service.category == category))
             if service is None:
-                db.add(Service(category=category, name=name, description=DESCRIPTIONS[category], base_price=base, min_price=minimum, max_price=maximum, typical_hours=hours, required_skills=[], margin_target=.3))
+                db.add(Service(category=category, name=name, description=DESCRIPTIONS[category], base_price=base, min_price=minimum, max_price=maximum, typical_hours=hours, required_skills=[], margin_target=.3, demo_url=DEMO_URLS.get(category)))
                 continue
+            if not service.demo_url and category in DEMO_URLS:
+                service.demo_url = DEMO_URLS[category]
             if catalog is CATALOG_RUB and (service.base_price, service.min_price, service.max_price) in OLD_USD_PRICES:
                 # Untouched USD defaults from an older seed: switch them to the ruble catalog.
                 service.base_price, service.min_price, service.max_price = base, minimum, maximum

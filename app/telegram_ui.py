@@ -59,7 +59,12 @@ def application_card(lead: Lead, application: Application, price: float | None =
 
 
 def application_keyboard(lead: Lead, application: Application) -> InlineKeyboardMarkup:
+    from app.services.outreach import lead_contact, outreach_ready
+
     rows: list[list[InlineKeyboardButton]] = []
+    contact = lead_contact(lead) if outreach_ready() else None
+    if contact and application.status in {"PENDING_REVIEW", "APPROVED"}:
+        rows.append([InlineKeyboardButton(text=f"🚀 Откликнуться: написать @{contact}", callback_data=f"dm_{application.id}")])
     if lead.url:
         rows.append([InlineKeyboardButton(text="🔗 Открыть заказ", url=lead.url)])
     if application.status == "PENDING_REVIEW":

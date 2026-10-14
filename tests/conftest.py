@@ -14,6 +14,7 @@ os.environ["MANUAL_PAYMENT_MODE"] = "true"
 os.environ["DEFAULT_CURRENCY"] = "USD"
 os.environ["CURRENCY_RATES"] = "RUB=90,EUR=0.92"
 os.environ["DEFAULT_HOURLY_RATE"] = "45"
+os.environ["MIN_BUDGET"] = "0"
 os.environ["TELEGRAM_API_URL"] = ""
 os.environ["TELEGRAM_PROXY"] = ""
 

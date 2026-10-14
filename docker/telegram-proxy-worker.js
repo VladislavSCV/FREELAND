@@ -4,7 +4,7 @@
 //
 // Forwarded: Bot API (/bot<token>/<method>, /file/bot<token>/<path>) and public channel previews
 // (/s/<channel> -> https://t.me/s/<channel>) used by the scraper. Optionally set the ALLOWED_BOT_ID
-// variable (the digits before ":" in your token) so the worker serves only your bot.
+// variable — the digits before ":" in each token, comma-separated — so the worker serves only your bots.
 
 export default {
   async fetch(request, env) {
@@ -16,7 +16,8 @@ export default {
     if (!match) {
       return new Response("Not found", { status: 404 });
     }
-    if (env.ALLOWED_BOT_ID && match[1] !== env.ALLOWED_BOT_ID) {
+    const allowed = (env.ALLOWED_BOT_ID || "").split(",").map((id) => id.trim()).filter(Boolean);
+    if (allowed.length && !allowed.includes(match[1])) {
       return new Response("Forbidden", { status: 403 });
     }
     const target = "https://api.telegram.org" + url.pathname + url.search;

@@ -19,6 +19,18 @@ class Settings(BaseSettings):
     # and/or an outgoing proxy (http://user:pass@host:port or socks5://...).
     telegram_api_url: str = ""
     telegram_proxy: str = ""
+    # One-click proposals to clients from Telegram channels, sent from the freelancer's own account.
+    # api_id/api_hash: my.telegram.org -> API development tools; session: output of `freelance tg-login`.
+    # Master switch for the «Откликнуться» button; off by default even when a session is configured.
+    tg_outreach_enabled: bool = False
+    tg_user_api_id: int = 0
+    tg_user_api_hash: str = ""
+    tg_user_session: str = ""
+    # MTProto goes to Telegram data centers directly; on servers in Russia use a proxy:
+    # socks5://user:pass@host:port, http://host:port or mtproxy://SECRET@host:port
+    tg_user_proxy: str = ""
+    tg_outreach_daily_limit: int = 20
+    tg_outreach_min_interval_seconds: int = 60
     telegram_webhook_secret: str = ""
     webhook_domain: str = ""
     llm_provider: str = "mock"
@@ -32,7 +44,7 @@ class Settings(BaseSettings):
     yandex_folder_id: str = ""
     default_currency: str = "USD"
     default_hourly_rate: float = 45
-    currency_rates: str = "RUB=90,EUR=0.92"
+    currency_rates: str = "RUB=90,EUR=0.92,UAH=41"
     min_fit_score: int = 70
     min_profit_score: int = 60
     followup_days: int = 2
@@ -42,22 +54,26 @@ class Settings(BaseSettings):
     score_risk_weight: float = 0.20
     autopilot_enabled: bool = False
     auto_apply_score: int = Field(default=7, validation_alias=AliasChoices("AUTOPILOT_THRESHOLD", "AUTO_APPLY_SCORE"))
-    review_score: int = 5
+    review_score: int = 6
     max_evaluations_per_tick: int = 10
     max_analysis_attempts: int = 5
     scraper_enabled: bool = True
     scraper_interval_seconds: int = 600
-    scraper_sources: str = "fl_rss,telegram"
+    # FL.ru (fl_rss) is off by default: proposals there are paid.
+    scraper_sources: str = "kwork,telegram"
+    # Scraped orders with a stated budget below this (DEFAULT_CURRENCY) are dropped before the LLM.
+    min_budget: float = 10000
     scraper_max_age_hours: int = 48
-    # Comma-separated feeds; FL.ru category=5 is programming, category=2 is websites; Kwork c=11 is "Разработка и IT".
-    fl_rss_url: str = "https://www.fl.ru/rss/all.xml?category=5,https://www.fl.ru/rss/all.xml?category=2"
+    # Comma-separated feeds. FL.ru: 5 programming, 2 websites, 31 AI, 41 business automation, 34 messengers; Kwork c=11 "Разработка и IT".
+    fl_rss_url: str = "https://www.fl.ru/rss/all.xml?category=5,https://www.fl.ru/rss/all.xml?category=2,https://www.fl.ru/rss/all.xml?category=31,https://www.fl.ru/rss/all.xml?category=41,https://www.fl.ru/rss/all.xml?category=34"
     kwork_projects_url: str = "https://kwork.ru/projects?c=11"
     # Pre-filter before the LLM: a scraped order needs an include word (title or text); an exclude word in the
     # title drops it unless the title also has an include word.
     # Words match at a word start, so "бот" matches "бота" but not "работа". Empty include list disables it.
-    scraper_include_keywords: str = "бот,telegram,телеграм,тг,python,питон,парс,скрипт,crm,амо,amocrm,битрикс,bitrix,интеграц,api,апи,webhook,вебхук,gpt,chatgpt,openai,yandexgpt,llm,нейросет,ии,ai,ai-,автоматизац,автоматиз,mini app,миниапп,fastapi,django,aiogram,лендинг,landing,rag,langchain,crewai,pinecone,dify,мультиагент,база знаний,базы знаний,квалификация лидов,квалификации лидов,автоматизация продаж,чат-бот,docker,kubernetes,k8s,devops,ci/cd,cicd,gitlab,github actions,деплой,задеплоить,развернуть,развертыван,развёртыван,сервер,vps,vds,хостинг,nginx,linux,линукс,администрирован,мониторинг,grafana,prometheus,terraform,ansible,бэкап,резервн,ssl,ollama,vllm,gpu,облак,cloud"
-    scraper_exclude_keywords: str = "логотип,дизайн,баннер,видео,монтаж,рилс,reels,прозвон,обзвон,звонк,копирайт,рерайт,статьи,статья,статей,smm,таргет,директ,seo,продвижен,перевод,озвуч,фотограф,иллюстрац,отзыв,1с,1c,unity,wordpress,figma"
-    telegram_channels: str = ""
+    scraper_include_keywords: str = "бот,telegram,телеграм,тг,python,питон,парс,скрипт,crm,амо,amocrm,битрикс,bitrix,интеграц,api,апи,webhook,вебхук,gpt,chatgpt,openai,yandexgpt,llm,нейросет,ии,ai,ai-,автоматизац,автоматиз,mini app,миниапп,fastapi,django,aiogram,лендинг,landing,rag,langchain,crewai,pinecone,dify,мультиагент,база знаний,базы знаний,квалификация лидов,квалификации лидов,автоматизация продаж,чат-бот,docker,kubernetes,k8s,devops,ci/cd,cicd,gitlab,github actions,деплой,задеплоить,развернуть,развертыван,развёртыван,сервер,vps,vds,хостинг,nginx,linux,линукс,администрирован,мониторинг,grafana,prometheus,terraform,ansible,бэкап,резервн,ssl,ollama,vllm,gpu,облак,cloud,bot,website,web app,webapp,scrap,automation,automate,integrat,deploy,server,backend,fullstack,full-stack,chatbot,ai agent,openai,devops,infrastructure"
+    scraper_exclude_keywords: str = "логотип,дизайн,баннер,видео,монтаж,рилс,reels,прозвон,обзвон,звонк,копирайт,рерайт,статьи,статья,статей,smm,таргет,директ,seo,продвижен,перевод,озвуч,фотограф,иллюстрац,отзыв,1с,1c,unity,wordpress,figma,success story,trending,hired"
+    # Checked 2026-10-14 (about 180 candidates): public channels that post project orders, not vacancies.
+    telegram_channels: str = "it_zakazy,zakazy_it,freelance_gigs,freelancehuntprojects,laborx"
     brightdata_proxy_url: str = ""
     brightdata_token: str = ""
     brightdata_zone: str = ""
@@ -68,6 +84,12 @@ class Settings(BaseSettings):
     yookassa_shop_id: str = ""
     yookassa_secret_key: str = ""
     reports_dir: str = "./reports"
+
+    @field_validator("tg_user_api_id", mode="before")
+    @classmethod
+    def empty_api_id(cls, value):
+        # "TG_USER_API_ID=" in .env means "not set".
+        return 0 if isinstance(value, str) and not value.strip() else value
 
     @field_validator("database_url")
     @classmethod

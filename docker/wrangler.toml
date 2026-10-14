@@ -7,5 +7,5 @@ compatibility_date = "2026-10-01"
 workers_dev = true
 
 [vars]
-# Digits before ":" in TELEGRAM_BOT_TOKEN; the worker serves only this bot.
-ALLOWED_BOT_ID = "8647410673"
+# Digits before ":" in each bot token, comma-separated: Freelance OS bot and the demo bot.
+ALLOWED_BOT_ID = "8647410673,7833399451"
